@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from typing import Protocol
+
 from .cache import Cache, CacheEntry
 from .config import (
     API_URL,
@@ -19,12 +21,24 @@ from .mediawiki import MediaWikiClient, MediaWikiError, Page
 WIKI_BASE_URL = "https://zh.moegirl.org.cn"
 
 
+class WikiClient(Protocol):
+    """The part of the wiki client the service depends on."""
+
+    def fetch_pages(self, titles: list[str]) -> dict[str, Page]:
+        """Return one page per requested title, keyed by the requested title."""
+        ...
+
+    def search_titles(self, query: str, limit: int = 10) -> list[str]:
+        """Return the titles matching a search query, best match first."""
+        ...
+
+
 class DictionaryService:
     """Answer dictionary queries, using the wiki online and a local cache."""
 
     def __init__(
         self,
-        client: MediaWikiClient | None = None,
+        client: WikiClient | None = None,
         cache: Cache | None = None,
         ttl: float | None = None,
         extract_chars: int = DEFAULT_EXTRACT_CHARS,

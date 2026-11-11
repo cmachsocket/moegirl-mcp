@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 import pytest
+from mcp.types import CallToolResult, InputRequiredResult
 
 from moegirl_mcp.cache import Cache
 from moegirl_mcp.mediawiki import Page
@@ -16,6 +17,17 @@ from moegirl_mcp.server import create_server
 from moegirl_mcp.service import DictionaryService
 
 from .test_service import FakeClient
+
+
+def _payload(result: CallToolResult | InputRequiredResult) -> dict:
+    """Read the JSON payload out of a tool result."""
+    if not isinstance(result, CallToolResult):
+        raise AssertionError("the tool asked for input instead of answering")
+    for block in result.content:
+        text = getattr(block, "text", None)
+        if text is not None:
+            return json.loads(text)
+    raise AssertionError("the tool returned no text content")
 
 
 @pytest.fixture()
@@ -48,7 +60,7 @@ def test_lookup_tool_answers_with_the_entry(service: DictionaryService) -> None:
 
     result = asyncio.run(server.call_tool("moegirl_lookup", {"term": "明日方舟"}))
 
-    payload = json.loads(result.content[0].text)
+    payload = _payload(result)
     assert payload["results"][0]["title"] == "明日方舟"
     assert payload["results"][0]["extract"] == "《明日方舟》是由鹰角网络开发的游戏。"
 
@@ -58,7 +70,7 @@ def test_search_tool_answers_with_the_matches(service: DictionaryService) -> Non
 
     result = asyncio.run(server.call_tool("moegirl_search", {"query": "明日方舟"}))
 
-    payload = json.loads(result.content[0].text)
+    payload = _payload(result)
     assert payload["count"] == 1
     assert payload["results"][0]["title"] == "明日方舟"
 
@@ -68,7 +80,7 @@ def test_stats_tool_reports_the_cache(service: DictionaryService) -> None:
 
     result = asyncio.run(server.call_tool("moegirl_stats", {}))
 
-    payload = json.loads(result.content[0].text)
+    payload = _payload(result)
     assert payload["cache"]["pages"] == 0
 
 

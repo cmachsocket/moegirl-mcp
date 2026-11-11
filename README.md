@@ -23,6 +23,10 @@ uv venv --python 3.12
 uv pip install -e '.[dev]'
 ```
 
+本项目用项目内的 `.venv`，**不要装进共享的 `~/uvenv`**：它需要 `mcp>=2`，
+而 mcp 2.x 删掉了 `mcp.server.fastmcp`，会让共享环境里的 `langchain-mcp-adapters`
+和 `mcp-server` 直接 import 失败。
+
 ## 接入 OpenCode
 
 在 `opencode.json` 里挂载：

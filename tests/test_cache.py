@@ -28,8 +28,13 @@ def test_get_counts_hits(tmp_path: Path) -> None:
     cache = Cache(tmp_path / "cache.db")
     cache.put("A", "a")
 
-    assert cache.get("A").hits == 1
-    assert cache.get("A").hits == 2
+    first = cache.get("A")
+    second = cache.get("A")
+
+    assert first is not None
+    assert second is not None
+    assert first.hits == 1
+    assert second.hits == 2
 
 
 def test_get_returns_none_for_an_unknown_title(tmp_path: Path) -> None:
@@ -42,7 +47,10 @@ def test_put_replaces_an_earlier_entry(tmp_path: Path) -> None:
     cache.put("A", "old")
     cache.put("A", "new")
 
-    assert cache.get("A").extract == "new"
+    entry = cache.get("A")
+
+    assert entry is not None
+    assert entry.extract == "new"
     assert cache.stats()["pages"] == 1
 
 
@@ -99,4 +107,7 @@ def test_the_cache_survives_a_reopen(tmp_path: Path) -> None:
     path = tmp_path / "cache.db"
     Cache(path).put("A", "a")
 
-    assert Cache(path).get("A").extract == "a"
+    entry = Cache(path).get("A")
+
+    assert entry is not None
+    assert entry.extract == "a"

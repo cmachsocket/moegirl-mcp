@@ -15,6 +15,7 @@ from pathlib import Path
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from mcp.types import TextContent
 
 SERVER = Path(__file__).resolve().parent.parent / ".venv" / "bin" / "moegirl-mcp"
 
@@ -39,7 +40,7 @@ async def run(db: Path) -> int:
             ):
                 result = await session.call_tool(call["name"], call["arguments"])
                 text = "".join(
-                    block.text for block in result.content if getattr(block, "type", "") == "text"
+                    block.text for block in result.content if isinstance(block, TextContent)
                 )
                 print(f"\n--- {call['name']} ---")
                 print(json.dumps(json.loads(text), ensure_ascii=False, indent=2)[:1200])
