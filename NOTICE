@@ -1,0 +1,58 @@
+# NOTICE
+
+本项目代码以 [GNU Affero General Public License v3.0 或更高版本](LICENSE) 发布
+（SPDX-License-Identifier: `AGPL-3.0-or-later`），版权归 cmachsocket 所有。
+
+## 数据来源与许可边界
+
+本项目**不附带**任何词条数据。运行时通过 MediaWiki API 按需向萌娘百科
+（zh.moegirl.org.cn）在线抓取词条首段，并缓存在本机 SQLite 中。
+
+| 数据 | 来源 | 许可 |
+| --- | --- | --- |
+| 词条标题、词条首段释义 | 萌娘百科（Moegirlpedia） | CC BY-NC-SA 3.0 CN |
+
+因此：
+
+- **代码**（`src/`、`tests/`、`scripts/`）适用 AGPL-3.0。
+- **缓存中的词条内容**来自萌娘百科，适用 CC BY-NC-SA 3.0 CN，**不在 AGPL 范围内**。
+  该内容受「署名、非商业、相同方式共享」约束，使用者需自行履行。
+- 缓存文件位于 `data/cache.db`（或 `$XDG_DATA_HOME/moegirl-mcp/cache.db`），
+  属本地运行产物，已在 `.gitignore` 中排除。
+
+## 第三方依赖
+
+依赖均为宽松许可，不影响本项目的 AGPL-3.0 发布：
+
+| 依赖 | 版本 | 许可 |
+| --- | --- | --- |
+| mcp | 2.3.0 | MIT |
+| requests | 2.34.2 | Apache-2.0 |
+| urllib3 | 2.8.0 | MIT |
+| certifi | 2026.10.23 | MPL-2.0 |
+| idna | 3.20 | BSD-3-Clause |
+| charset-normalizer | 3.5.2 | MIT |
+| pydantic | 2.14.3 | MIT |
+| pydantic-core | 2.50.4 | MIT |
+| anyio | 4.16.0 | MIT |
+| starlette | 1.10.0 | BSD-3-Clause |
+| uvicorn | 0.54.0 | BSD-3-Clause |
+| sse-starlette | 3.7.0 | BSD-3-Clause |
+| httpx | 0.28.1 | BSD-3-Clause |
+| httpcore | 1.0.9 | BSD-3-Clause |
+| h11 | 0.16.0 | MIT |
+| typing-extensions | 4.16.0 | PSF-2.0 |
+| annotated-types | 0.8.0 | MIT |
+| jsonschema | 4.26.0 | MIT |
+| python-multipart | 0.0.33 | Apache-2.0 |
+
+开发期依赖：pytest（MIT）、ruff（MIT）。
+
+## 外部请求
+
+| 请求 | 目的 | 触发时机 |
+| --- | --- | --- |
+| `GET https://zh.moegirl.org.cn/api.php` | 抓取词条首段释义、标题搜索 | 缓存未命中或已过期时 |
+
+请求会带上 `User-Agent`（含项目标识与 mw2fcitx 链接）。用户词条查询内容会发送到
+萌娘百科，不经过任何第三方中间服务。
