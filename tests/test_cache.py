@@ -121,6 +121,7 @@ def test_purge_removes_only_expired_entries(tmp_path: Path) -> None:
     cache.put("stale", "b")
 
     connection = cache._connect()  # noqa: SLF001
+    assert connection is not None
     connection.execute(
         "UPDATE pages SET fetched_at = ? WHERE title = 'stale'", (time.time() - 7200,)
     )
@@ -192,3 +193,13 @@ def test_stats_report_availability(tmp_path: Path) -> None:
     assert cache.available
     assert cache.stats()["available"] is True
     assert cache.stats()["error"] is None
+
+
+def test_a_thread_that_cannot_open_the_database_reports_no_entry(tmp_path: Path) -> None:
+    blocker = tmp_path / "blocker"
+    blocker.write_text("not a directory")
+    cache = Cache(blocker / "cache.db")
+
+    assert cache._connect() is None  # noqa: SLF001
+    assert cache.get("A") is None
+    assert cache.stats()["available"] is False

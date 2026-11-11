@@ -88,6 +88,8 @@ class Cache:
         if not self._ensure_ready():
             return None
         conn = self._connect()
+        if conn is None:
+            return None
         row = conn.execute(
             "SELECT title, extract, pageid, lastrevid, canonical, fetched_at, hits"
             " FROM pages WHERE title = ?",
@@ -119,16 +121,21 @@ class Cache:
         if not self._ensure_ready():
             return
         conn = self._connect()
-        conn.execute(
-            "INSERT INTO pages (title, extract, pageid, lastrevid, canonical, fetched_at, hits)"
-            " VALUES (?, ?, ?, ?, ?, ?, 0)"
-            " ON CONFLICT(title) DO UPDATE SET"
-            " extract = excluded.extract, pageid = excluded.pageid,"
-            " lastrevid = excluded.lastrevid, canonical = excluded.canonical,"
-            " fetched_at = excluded.fetched_at",
-            (title, extract, pageid, lastrevid, canonical or title, time.time()),
-        )
-        conn.commit()
+        if conn is None:
+            return
+        try:
+            conn.execute(
+                "INSERT INTO pages (title, extract, pageid, lastrevid, canonical, fetched_at, hits)"
+                " VALUES (?, ?, ?, ?, ?, ?, 0)"
+                " ON CONFLICT(title) DO UPDATE SET"
+                " extract = excluded.extract, pageid = excluded.pageid,"
+                " lastrevid = excluded.lastrevid, canonical = excluded.canonical,"
+                " fetched_at = excluded.fetched_at",
+                (title, extract, pageid, lastrevid, canonical or title, time.time()),
+            )
+            conn.commit()
+        except sqlite3.Error as error:
+            self._error = f"{type(error).__name__}: {error}"
 
     def stats(self) -> dict:
         """Summarise the content of the cache."""
@@ -138,7 +145,8 @@ class Cache:
             "available": self.available,
             "error": self._error,
         }
-        if not self._ensure_ready():
+        conn = self._connect() if self._ensure_ready() else None
+        if conn is None:
             return base | {
                 "pages": 0,
                 "fresh_pages": 0,
@@ -147,7 +155,6 @@ class Cache:
                 "oldest": None,
                 "newest": None,
             }
-        conn = self._connect()
         row = conn.execute(
             "SELECT COUNT(*) AS pages, COALESCE(SUM(length(extract)), 0) AS chars,"
             " COALESCE(SUM(hits), 0) AS hits, MIN(fetched_at) AS oldest, MAX(fetched_at) AS newest"
@@ -171,6 +178,8 @@ class Cache:
         if not self._ensure_ready():
             return 0
         conn = self._connect()
+        if conn is None:
+            return 0
         count = conn.execute("SELECT COUNT(*) FROM pages").fetchone()[0]
         conn.execute("DELETE FROM pages")
         conn.commit()
@@ -181,6 +190,8 @@ class Cache:
         if not self._ensure_ready():
             return 0
         conn = self._connect()
+        if conn is None:
+            return 0
         cutoff = time.time() - (self.ttl if ttl is None else ttl)
         count = conn.execute(
             "SELECT COUNT(*) FROM pages WHERE fetched_at <= ?", (cutoff,)
@@ -200,8 +211,10 @@ class Cache:
             if now < self._retry_at:
                 return False
             self._retry_at = now + RETRY_INTERVAL
+            conn = self._connect()
+            if conn is None:
+                return False
             try:
-                conn = self._connect()
                 with conn:
                     conn.executescript(SCHEMA)
             except sqlite3.Error as error:
@@ -211,17 +224,21 @@ class Cache:
             self._error = None
             return True
 
-    def _connect(self) -> sqlite3.Connection:
+    def _connect(self) -> sqlite3.Connection | None:
+        """Return the connection of the calling thread, opening it if needed."""
         conn = getattr(self._local, "conn", None)
-        if conn is None:
+        if conn is not None:
+            return conn
+        try:
             conn = sqlite3.connect(self.path, timeout=BUSY_TIMEOUT, check_same_thread=False)
-            try:
-                conn.row_factory = sqlite3.Row
-                self._configure(conn)
-            except sqlite3.Error:
+            conn.row_factory = sqlite3.Row
+            self._configure(conn)
+        except sqlite3.Error as error:
+            self._error = f"{type(error).__name__}: {error}"
+            if conn is not None:
                 conn.close()
-                raise
-            self._local.conn = conn
+            return None
+        self._local.conn = conn
         return conn
 
     def _configure(self, conn: sqlite3.Connection) -> None:
