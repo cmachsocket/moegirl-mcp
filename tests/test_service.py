@@ -226,3 +226,15 @@ def test_stats_report_the_cache(cache: Cache) -> None:
     assert stats["cache"]["pages"] == 1
     assert stats["ttl_seconds"] == 3600
     assert stats["api"].endswith("/api.php")
+
+
+def test_the_lookup_survives_a_broken_cache(tmp_path: Path) -> None:
+    blocker = tmp_path / "blocker"
+    blocker.write_text("not a directory")
+    client = FakeClient(pages={"明日方舟": Page(title="明日方舟", extract="《明日方舟》是游戏。")})
+    service = DictionaryService(client=client, cache=Cache(blocker / "cache.db"), ttl=3600)
+
+    payload = service.lookup("明日方舟")
+
+    assert payload["source"] == "live"
+    assert payload["results"][0]["extract"] == "《明日方舟》是游戏。"

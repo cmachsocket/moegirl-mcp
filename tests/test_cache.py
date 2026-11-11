@@ -4,10 +4,37 @@
 
 from __future__ import annotations
 
+import sqlite3
 import time
 from pathlib import Path
+from typing import Any, cast
 
 from moegirl_mcp.cache import Cache
+
+
+class _Cursor:
+    """A cursor answering with a single canned row."""
+
+    def __init__(self, value: Any) -> None:
+        self._value = value
+
+    def fetchone(self) -> tuple[Any, ...]:
+        return (self._value,)
+
+
+class _RefusingConnection:
+    """A connection whose journal mode switch is refused by a lock."""
+
+    def __init__(self) -> None:
+        self.statements: list[str] = []
+
+    def execute(self, sql: str) -> _Cursor:
+        self.statements.append(sql)
+        if sql.strip().lower() == "pragma journal_mode":
+            return _Cursor("delete")
+        if "journal_mode=WAL" in sql:
+            raise sqlite3.OperationalError("database is locked")
+        return _Cursor(None)
 
 
 def test_put_and_get_round_trip(tmp_path: Path) -> None:
@@ -111,3 +138,57 @@ def test_the_cache_survives_a_reopen(tmp_path: Path) -> None:
 
     assert entry is not None
     assert entry.extract == "a"
+
+
+def test_a_refused_journal_switch_is_not_fatal(tmp_path: Path) -> None:
+    cache = Cache(tmp_path / "cache.db")
+    connection = _RefusingConnection()
+
+    cache._configure(cast(sqlite3.Connection, connection))  # noqa: SLF001
+
+    assert "PRAGMA journal_mode=WAL" in connection.statements
+    assert "PRAGMA synchronous=NORMAL" in connection.statements
+
+
+def test_a_switch_to_wal_is_skipped_when_the_database_is_already_in_it(
+    tmp_path: Path,
+) -> None:
+    cache = Cache(tmp_path / "cache.db")
+    connection = _RefusingConnection()
+
+    def execute(sql: str) -> _Cursor:
+        connection.statements.append(sql)
+        if sql.strip().lower() == "pragma journal_mode":
+            return _Cursor("wal")
+        return _Cursor(None)
+
+    connection.execute = execute  # type: ignore[method-assign]
+    cache._configure(cast(sqlite3.Connection, connection))  # noqa: SLF001
+
+    assert "PRAGMA journal_mode=WAL" not in connection.statements
+
+
+def test_a_broken_cache_degrades_to_a_no_op(tmp_path: Path) -> None:
+    blocker = tmp_path / "blocker"
+    blocker.write_text("not a directory")
+    cache = Cache(blocker / "cache.db")
+
+    assert not cache.available
+    assert cache.get("A") is None
+    cache.put("A", "a")
+    assert cache.clear() == 0
+    assert cache.purge_expired() == 0
+
+    stats = cache.stats()
+
+    assert stats["pages"] == 0
+    assert stats["available"] is False
+    assert stats["error"]
+
+
+def test_stats_report_availability(tmp_path: Path) -> None:
+    cache = Cache(tmp_path / "cache.db")
+
+    assert cache.available
+    assert cache.stats()["available"] is True
+    assert cache.stats()["error"] is None

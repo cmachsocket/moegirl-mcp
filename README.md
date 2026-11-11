@@ -58,6 +58,7 @@ moegirl-mcp search "舰娘" --limit 3      # 搜索，输出 JSON
 moegirl-mcp stats                       # 查看缓存状态
 moegirl-mcp cache clear                 # 清空缓存
 moegirl-mcp cache purge                 # 只清理过期条目
+moegirl-mcp doctor                      # 体检缓存所在位置能否放下 SQLite
 ```
 
 ## 工具
@@ -115,6 +116,24 @@ moegirl-mcp cache purge                 # 只清理过期条目
 | `MOEGIRL_MCP_RATE_LIMIT` | `3.0` | 每秒最多发起的 wiki 请求数 |
 
 `serve` 子命令还支持 `--db`、`--ttl`、`--rate-limit`、`--extract-chars` 覆盖对应默认值。
+
+### 缓存放不下时
+
+缓存只是加速手段，放不下也不影响查词：缓存打不开时 server 照常工作，只是每次都走在线请求，
+并在 stderr 上打印一行原因。
+
+有些文件系统（网络盘、容器里的 proot 根文件系统等）不支持 SQLite 需要的文件锁，
+`doctor` 可以分辨是缓存坏了还是 wiki 坏了：
+
+```sh
+moegirl-mcp doctor --db /path/to/cache.db
+```
+
+输出里 `healthy` 为 `false` 时，把缓存挪到本地盘即可：
+
+```sh
+export MOEGIRL_MCP_DB=~/.local/share/moegirl-mcp/cache.db
+```
 
 ## 与 mw2fcitx 的关系
 

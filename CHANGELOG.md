@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+Keep the server alive when the cache cannot be opened.
+
+- Switch the database to the WAL journal mode only when it is not in it
+  already, and ignore a refused switch. The upgrade needs an exclusive lock on
+  the database file that is not taken through the busy handler, so it failed
+  with "database is locked" when a second instance of the server started at the
+  same time.
+- Degrade to a cache free lookup when the database cannot be opened, reporting
+  the reason on stderr. The wiki lookup never fails because of the cache.
+- Add `moegirl-mcp doctor`, which probes the cache location for write access,
+  locking and journal mode support.
+
 ## 0.2.0
 
 Switch from an offline corpus to an online lookup service.

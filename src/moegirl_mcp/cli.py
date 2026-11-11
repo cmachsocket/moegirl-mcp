@@ -17,6 +17,7 @@ from .config import (
     cache_ttl,
     rate_limit,
 )
+from .diagnostics import diagnose
 from .mediawiki import MediaWikiClient, RateLimiter
 from .server import create_server
 from .service import DictionaryService
@@ -67,6 +68,13 @@ def build_parser() -> argparse.ArgumentParser:
     cache_purge = cache_sub.add_parser("purge", help="Drop expired pages only.")
     _add_cache_options(cache_purge)
 
+    doctor = subparsers.add_parser("doctor", help="Check whether the cache location works.")
+    doctor.add_argument(
+        "--db",
+        default=None,
+        help="Path of the SQLite cache (default: the configured cache file).",
+    )
+
     return parser
 
 
@@ -99,6 +107,8 @@ def main(argv: list[str] | None = None) -> int:
         return _stats(args)
     if args.command == "cache":
         return _cache(args)
+    if args.command == "doctor":
+        return _doctor(args)
     return 1
 
 
@@ -160,6 +170,13 @@ def _cache(args: argparse.Namespace) -> int:
         removed = cache.purge_expired()
     _print({"removed": removed, "cache": cache.stats()})
     return 0
+
+
+def _doctor(args: argparse.Namespace) -> int:
+    """Report whether the cache location can hold a SQLite database."""
+    report = diagnose(args.db)
+    _print(report)
+    return 0 if report["healthy"] else 1
 
 
 def _print(payload: dict) -> None:
