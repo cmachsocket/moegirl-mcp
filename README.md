@@ -33,11 +33,15 @@ uv pip install -e '.[dev]'
     "moegirl": {
       "type": "local",
       "command": ["/home/cmach_socket/projects/moegirl-mcp/.venv/bin/moegirl-mcp", "serve"],
-      "enabled": true
+      "enabled": true,
+      "timeout": 60000
     }
   }
 }
 ```
+
+`timeout` 单位是毫秒，OpenCode 默认只有 5000 ms，而一次实时检索可能耗时 10 秒以上，
+因此要放宽。改完配置后用 `opencode mcp list` 确认状态是 `connected`。
 
 任何支持 stdio 的 MCP 客户端都可以用同样的方式接入。
 
